@@ -1,12 +1,31 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import BottomNavigation from "@/components/BottomNavigation";
+import ChatInterface from "@/components/ChatInterface";
+import MoodTracker from "@/components/MoodTracker";
+import LearningHub from "@/components/LearningHub";
 
 const Index = () => {
+  const [activeTab, setActiveTab] = useState("chat");
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "chat":
+        return <ChatInterface />;
+      case "mood":
+        return <MoodTracker />;
+      case "learn":
+        return <LearningHub />;
+      default:
+        return <ChatInterface />;
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-gradient-calm flex flex-col">
+      <main className="flex-1 pb-20 overflow-hidden">
+        {renderContent()}
+      </main>
+      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 };
