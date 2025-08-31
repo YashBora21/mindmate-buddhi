@@ -1,4 +1,4 @@
-import { MessageCircle, Heart, BookOpen } from "lucide-react";
+import { MessageCircle, Heart, BookOpen, PenTool } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BottomNavigationProps {
@@ -10,6 +10,7 @@ const BottomNavigation = ({ activeTab, onTabChange }: BottomNavigationProps) => 
   const tabs = [
     { id: "chat", label: "Chat", icon: MessageCircle },
     { id: "mood", label: "Mood", icon: Heart },
+    { id: "journal", label: "Journal", icon: PenTool },
     { id: "learn", label: "Learn", icon: BookOpen },
   ];
 

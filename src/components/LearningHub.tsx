@@ -1,37 +1,107 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Lightbulb } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ChevronLeft, ChevronRight, Star, Trophy, Lightbulb } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 const LearningHub = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [userPoints, setUserPoints] = useState(0);
+  const [revealedItems, setRevealedItems] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (user) {
+      fetchUserPoints();
+    }
+  }, [user]);
+
+  const fetchUserPoints = async () => {
+    const { data, error } = await supabase
+      .from('user_points')
+      .select('points')
+      .eq('user_id', user?.id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching points:', error);
+    } else {
+      setUserPoints(data?.points || 0);
+    }
+  };
+
+  const awardPoints = async () => {
+    if (!user || revealedItems.has(currentIndex)) return;
+
+    try {
+      // First check if user_points record exists
+      const { data: existing } = await supabase
+        .from('user_points')
+        .select('points')
+        .eq('user_id', user.id)
+        .single();
+
+      const currentPoints = existing?.points || 0;
+      const newPoints = currentPoints + 10;
+
+      const { error } = await supabase
+        .from('user_points')
+        .upsert([
+          {
+            user_id: user.id,
+            points: newPoints,
+          },
+        ]);
+
+      if (!error) {
+        setUserPoints(newPoints);
+        setRevealedItems(prev => new Set([...prev, currentIndex]));
+        toast({
+          title: "Great job! 🎉",
+          description: "You earned 10 points for learning something new!",
+        });
+      }
+    } catch (error) {
+      console.error('Error awarding points:', error);
+    }
+  };
 
   const mythsFacts = [
     {
-      myth: "Talking about stress makes it worse.",
-      fact: "Actually, talking about stress with trusted people or professionals helps reduce its impact and provides healthy coping strategies.",
-      emoji: "😰"
-    },
-    {
-      myth: "Mental health issues are just a phase that will pass.",
-      fact: "Mental health conditions are real medical conditions that benefit from proper care, support, and sometimes professional treatment.",
-      emoji: "🌱"
-    },
-    {
-      myth: "Only weak people struggle with mental health.",
-      fact: "Mental health challenges can affect anyone regardless of strength, success, or background. Seeking help shows courage and self-awareness.",
+      myth: "Talking about mental health means you're weak",
+      fact: "Seeking help shows courage and self-awareness. Mental health struggles are common and treatable.",
       emoji: "💪"
     },
     {
-      myth: "Young people don't have real problems to stress about.",
-      fact: "Academic pressure, social dynamics, and future uncertainties create significant stress for young people that deserves recognition and support.",
+      myth: "Only people with severe problems need mental health support",
+      fact: "Mental wellness is for everyone. Taking care of your mind is as important as physical health.",
+      emoji: "🧠"
+    },
+    {
+      myth: "Stress and anxiety are just part of being a student",
+      fact: "While some stress is normal, persistent anxiety affects learning and well-being. Support is available.",
       emoji: "🎓"
     },
     {
-      myth: "You should handle mental health problems alone.",
-      fact: "Support from friends, family, and professionals is crucial for mental wellness. Community and connection are powerful healing tools.",
+      myth: "Meditation and relaxation are just trends",
+      fact: "Mindfulness practices are scientifically proven to reduce stress, improve focus, and enhance emotional regulation.",
+      emoji: "🧘"
+    },
+    {
+      myth: "Mental health problems are permanent",
+      fact: "With proper support, therapy, and sometimes medication, most mental health conditions are treatable and manageable.",
+      emoji: "🌱"
+    },
+    {
+      myth: "You should be able to handle everything on your own",
+      fact: "Humans are social beings. Seeking support from friends, family, or professionals is healthy and normal.",
       emoji: "🤝"
     }
   ];
@@ -50,13 +120,30 @@ const LearningHub = () => {
 
   const handleReveal = () => {
     setIsRevealed(true);
+    if (user && !revealedItems.has(currentIndex)) {
+      awardPoints();
+    }
   };
 
+  const progressPercentage = Math.round((revealedItems.size / mythsFacts.length) * 100);
+
   return (
-    <div className="p-6 max-w-md mx-auto">
+    <div className="p-6 max-w-md mx-auto min-h-screen flex flex-col">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-foreground mb-2">Awareness Hub</h1>
-        <p className="text-muted-foreground">Myth vs Fact</p>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-6 h-6 text-warning" />
+            <span className="text-lg font-semibold text-foreground">{userPoints}</span>
+            <span className="text-sm text-muted-foreground">points</span>
+          </div>
+          <Badge variant="secondary" className="flex items-center gap-1">
+            <Star className="w-3 h-3" />
+            {revealedItems.size}/{mythsFacts.length} completed
+          </Badge>
+        </div>
+        <Progress value={progressPercentage} className="mb-4" />
+        <h1 className="text-2xl font-bold text-foreground mb-2">Learning Hub</h1>
+        <p className="text-muted-foreground">Debunking Mental Health Myths</p>
       </div>
 
       <div className="relative mb-6">
@@ -98,9 +185,15 @@ const LearningHub = () => {
           {!isRevealed && (
             <Button
               onClick={handleReveal}
-              className="mx-auto bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full font-medium transition-all duration-300 hover:scale-105"
+              className={cn(
+                "mx-auto px-6 py-2 rounded-full font-medium transition-all duration-300 hover:scale-105",
+                revealedItems.has(currentIndex) 
+                  ? "bg-success/20 text-success border-success" 
+                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
+              )}
+              disabled={revealedItems.has(currentIndex)}
             >
-              Tap to reveal the fact
+              {revealedItems.has(currentIndex) ? "✓ Already revealed" : "Tap to reveal the fact"}
             </Button>
           )}
         </Card>

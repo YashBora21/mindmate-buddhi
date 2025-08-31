@@ -5,6 +5,7 @@ import { MessageCircle, Send } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Message {
   id: string;
@@ -14,6 +15,7 @@ interface Message {
 }
 
 const ChatInterface = () => {
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [isStarted, setIsStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,7 +70,7 @@ const ChatInterface = () => {
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, botResponse]);
+      setMessages([...newMessages, botResponse]);
 
       if (data.isHighRisk) {
         toast({
