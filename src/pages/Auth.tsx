@@ -10,9 +10,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Heart } from 'lucide-react';
 
 const Auth = () => {
-  const { signUp, signIn, user, loading } = useAuth();
+  const { signUp, signIn, resetPassword, user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [resetSent, setResetSent] = useState(false);
 
   // Redirect if already logged in
   if (!loading && user) {
@@ -58,6 +59,27 @@ const Auth = () => {
     setIsLoading(false);
   };
 
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setResetSent(false);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+
+    const { error } = await resetPassword(email);
+    
+    if (error) {
+      setError(error.message);
+    } else {
+      setResetSent(true);
+      setError('');
+    }
+    
+    setIsLoading(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-calm flex items-center justify-center">
@@ -79,9 +101,10 @@ const Auth = () => {
         
         <CardContent>
           <Tabs defaultValue="signin" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="reset">Reset</TabsTrigger>
             </TabsList>
             
             <TabsContent value="signin">
@@ -153,7 +176,34 @@ const Auth = () => {
                 </Button>
               </form>
             </TabsContent>
+
+            <TabsContent value="reset">
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    name="email"
+                    type="email"
+                    placeholder="your.email@example.com"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? 'Sending reset link...' : 'Send Reset Link'}
+                </Button>
+              </form>
+            </TabsContent>
           </Tabs>
+          
+          {resetSent && (
+            <Alert className="mt-4 border-green-200 bg-green-50">
+              <AlertDescription className="text-green-800">
+                Password reset link sent! Check your email inbox.
+              </AlertDescription>
+            </Alert>
+          )}
           
           {error && (
             <Alert className="mt-4">
