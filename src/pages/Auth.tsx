@@ -33,9 +33,15 @@ const Auth = () => {
     const { error } = await signUp(email, password, displayName);
     
     if (error) {
-      setError(error.message);
+      if (error.message.includes('User already registered')) {
+        setError('This email is already registered. Please sign in instead or check your email for confirmation.');
+      } else {
+        setError(error.message);
+      }
     } else {
-      setError('Please check your email to confirm your account.');
+      setError('');
+      // Show success message instead of error
+      alert('Signup successful! Please check your email to confirm your account before signing in.');
     }
     
     setIsLoading(false);
@@ -53,7 +59,13 @@ const Auth = () => {
     const { error } = await signIn(email, password);
     
     if (error) {
-      setError(error.message);
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please check your credentials and try again.');
+      } else if (error.message.includes('Email not confirmed')) {
+        setError('Please check your email and confirm your account before signing in.');
+      } else {
+        setError(error.message);
+      }
     }
     
     setIsLoading(false);
