@@ -8,8 +8,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
-  updatePassword: (password: string) => Promise<{ error: any }>;
+  sendPasswordResetOTP: (email: string) => Promise<{ error: any }>;
+  verifyOTPAndResetPassword: (email: string, token: string, password: string) => Promise<{ error: any }>;
   loading: boolean;
 }
 
@@ -76,20 +76,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
-  const resetPassword = async (email: string) => {
-    const redirectUrl = `${window.location.origin}/reset-password`;
-    
+  const sendPasswordResetOTP = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
+      redirectTo: undefined, // Don't redirect, we'll handle OTP in the app
     });
     return { error };
   };
 
-  const updatePassword = async (password: string) => {
-    const { error } = await supabase.auth.updateUser({
+  const verifyOTPAndResetPassword = async (email: string, token: string, password: string) => {
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'recovery',
+    });
+    
+    if (error) return { error };
+    
+    // If OTP verification successful, update the password
+    const { error: updateError } = await supabase.auth.updateUser({
       password: password
     });
-    return { error };
+    
+    return { error: updateError };
   };
 
   const value = {
@@ -98,8 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signIn,
     signOut,
-    resetPassword,
-    updatePassword,
+    sendPasswordResetOTP,
+    verifyOTPAndResetPassword,
     loading,
   };
 

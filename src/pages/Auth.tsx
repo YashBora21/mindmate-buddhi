@@ -6,14 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuth } from '@/contexts/AuthContext';
 import { Heart } from 'lucide-react';
 
 const Auth = () => {
-  const { signUp, signIn, resetPassword, user, loading } = useAuth();
+  const { signUp, signIn, sendPasswordResetOTP, verifyOTPAndResetPassword, user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [resetSent, setResetSent] = useState(false);
+  const [showOTPInput, setShowOTPInput] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
 
   // Redirect if already logged in
   if (!loading && user) {
@@ -71,7 +74,7 @@ const Auth = () => {
     setIsLoading(false);
   };
 
-  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSendResetOTP = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
@@ -79,14 +82,52 @@ const Auth = () => {
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
+    setResetEmail(email);
 
-    const { error } = await resetPassword(email);
+    const { error } = await sendPasswordResetOTP(email);
     
     if (error) {
       setError(error.message);
     } else {
       setResetSent(true);
+      setShowOTPInput(true);
       setError('');
+    }
+    
+    setIsLoading(false);
+  };
+
+  const handleVerifyOTPAndResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    const formData = new FormData(e.currentTarget);
+    const otp = formData.get('otp') as string;
+    const newPassword = formData.get('newPassword') as string;
+    const confirmPassword = formData.get('confirmPassword') as string;
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      setIsLoading(false);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      setIsLoading(false);
+      return;
+    }
+
+    const { error } = await verifyOTPAndResetPassword(resetEmail, otp, newPassword);
+    
+    if (error) {
+      setError(error.message);
+    } else {
+      alert('Password updated successfully! You can now sign in with your new password.');
+      setShowOTPInput(false);
+      setResetSent(false);
+      setResetEmail('');
     }
     
     setIsLoading(false);
@@ -193,29 +234,89 @@ const Auth = () => {
             </TabsContent>
 
             <TabsContent value="reset">
-              <form onSubmit={handleForgotPassword} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email</Label>
-                  <Input
-                    id="reset-email"
-                    name="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    required
+              {!showOTPInput ? (
+                <form onSubmit={handleSendResetOTP} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      name="email"
+                      type="email"
+                      placeholder="your.email@example.com"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? 'Sending OTP...' : 'Send Reset OTP'}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOTPAndResetPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="otp">Enter OTP</Label>
+                    <div className="flex justify-center">
+                      <InputOTP maxLength={6} name="otp" disabled={isLoading}>
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <Input
+                      id="newPassword"
+                      name="newPassword"
+                      type="password"
+                      minLength={6}
+                      placeholder="Enter new password"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      minLength={6}
+                      placeholder="Confirm new password"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? 'Updating password...' : 'Update Password'}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full" 
+                    onClick={() => {
+                      setShowOTPInput(false);
+                      setResetSent(false);
+                      setError('');
+                    }}
                     disabled={isLoading}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Sending reset link...' : 'Send Reset Link'}
-                </Button>
-              </form>
+                  >
+                    Back to Email
+                  </Button>
+                </form>
+              )}
             </TabsContent>
           </Tabs>
           
           {resetSent && (
             <Alert className="mt-4 border-green-200 bg-green-50">
               <AlertDescription className="text-green-800">
-                Password reset link sent! Check your email inbox.
+                OTP sent to your email! Enter the 6-digit code above.
               </AlertDescription>
             </Alert>
           )}
