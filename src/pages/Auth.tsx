@@ -1,22 +1,29 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuth } from '@/contexts/AuthContext';
 import { Heart } from 'lucide-react';
 
 const Auth = () => {
-  const { signUp, signIn, sendPasswordResetOTP, verifyOTPAndResetPassword, user, loading } = useAuth();
+  const { signUp, signIn, sendPasswordResetEmail, updatePasswordWithToken, user, session, loading } = useAuth();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [resetSent, setResetSent] = useState(false);
-  const [showOTPInput, setShowOTPInput] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
+  const [isPasswordResetMode, setIsPasswordResetMode] = useState(false);
+
+  // Check if user came from password reset link
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'reset' && session) {
+      setIsPasswordResetMode(true);
+    }
+  }, [searchParams, session]);
 
   // Redirect if already logged in
   if (!loading && user) {
@@ -74,7 +81,7 @@ const Auth = () => {
     setIsLoading(false);
   };
 
-  const handleSendResetOTP = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSendResetEmail = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
@@ -82,28 +89,25 @@ const Auth = () => {
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
-    setResetEmail(email);
 
-    const { error } = await sendPasswordResetOTP(email);
+    const { error } = await sendPasswordResetEmail(email);
     
     if (error) {
       setError(error.message);
     } else {
       setResetSent(true);
-      setShowOTPInput(true);
       setError('');
     }
     
     setIsLoading(false);
   };
 
-  const handleVerifyOTPAndResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handlePasswordUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     const formData = new FormData(e.currentTarget);
-    const otp = formData.get('otp') as string;
     const newPassword = formData.get('newPassword') as string;
     const confirmPassword = formData.get('confirmPassword') as string;
 
@@ -119,19 +123,74 @@ const Auth = () => {
       return;
     }
 
-    const { error } = await verifyOTPAndResetPassword(resetEmail, otp, newPassword);
+    const { error } = await updatePasswordWithToken(newPassword);
     
     if (error) {
       setError(error.message);
     } else {
       alert('Password updated successfully! You can now sign in with your new password.');
-      setShowOTPInput(false);
-      setResetSent(false);
-      setResetEmail('');
+      setIsPasswordResetMode(false);
+      // Clear the search params
+      window.history.replaceState({}, document.title, '/auth');
     }
     
     setIsLoading(false);
   };
+
+  // Show password reset form if user came from reset link
+  if (isPasswordResetMode && session) {
+    return (
+      <div className="min-h-screen bg-gradient-calm flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-card">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-primary rounded-full flex items-center justify-center">
+              <Heart className="w-8 h-8 text-white" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-foreground">Reset Password</CardTitle>
+            <CardDescription>Enter your new password</CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <form onSubmit={handlePasswordUpdate} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input
+                  id="newPassword"
+                  name="newPassword"
+                  type="password"
+                  minLength={6}
+                  placeholder="Enter new password"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  minLength={6}
+                  placeholder="Confirm new password"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Updating password...' : 'Update Password'}
+              </Button>
+            </form>
+            
+            {error && (
+              <Alert className="mt-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -234,89 +293,29 @@ const Auth = () => {
             </TabsContent>
 
             <TabsContent value="reset">
-              {!showOTPInput ? (
-                <form onSubmit={handleSendResetOTP} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reset-email">Email</Label>
-                    <Input
-                      id="reset-email"
-                      name="email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Sending OTP...' : 'Send Reset OTP'}
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOTPAndResetPassword} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="otp">Enter OTP</Label>
-                    <div className="flex justify-center">
-                      <InputOTP maxLength={6} name="otp" disabled={isLoading}>
-                        <InputOTPGroup>
-                          <InputOTPSlot index={0} />
-                          <InputOTPSlot index={1} />
-                          <InputOTPSlot index={2} />
-                          <InputOTPSlot index={3} />
-                          <InputOTPSlot index={4} />
-                          <InputOTPSlot index={5} />
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input
-                      id="newPassword"
-                      name="newPassword"
-                      type="password"
-                      minLength={6}
-                      placeholder="Enter new password"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type="password"
-                      minLength={6}
-                      placeholder="Confirm new password"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Updating password...' : 'Update Password'}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="w-full" 
-                    onClick={() => {
-                      setShowOTPInput(false);
-                      setResetSent(false);
-                      setError('');
-                    }}
+              <form onSubmit={handleSendResetEmail} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    name="email"
+                    type="email"
+                    placeholder="your.email@example.com"
+                    required
                     disabled={isLoading}
-                  >
-                    Back to Email
-                  </Button>
-                </form>
-              )}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? 'Sending reset email...' : 'Send Reset Email'}
+                </Button>
+              </form>
             </TabsContent>
           </Tabs>
           
           {resetSent && (
             <Alert className="mt-4 border-green-200 bg-green-50">
               <AlertDescription className="text-green-800">
-                OTP sent to your email! Enter the 6-digit code above.
+                Reset email sent! Click the link in your email to continue.
               </AlertDescription>
             </Alert>
           )}

@@ -8,8 +8,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  sendPasswordResetOTP: (email: string) => Promise<{ error: any }>;
-  verifyOTPAndResetPassword: (email: string, token: string, password: string) => Promise<{ error: any }>;
+  sendPasswordResetEmail: (email: string) => Promise<{ error: any }>;
+  updatePasswordWithToken: (password: string) => Promise<{ error: any }>;
   loading: boolean;
 }
 
@@ -76,28 +76,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
-  const sendPasswordResetOTP = async (email: string) => {
+  const sendPasswordResetEmail = async (email: string) => {
+    // Send reset email that redirects back to auth page with token
+    const redirectUrl = `${window.location.origin}/auth?tab=reset`;
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: undefined, // Don't redirect, we'll handle OTP in the app
+      redirectTo: redirectUrl,
     });
     return { error };
   };
 
-  const verifyOTPAndResetPassword = async (email: string, token: string, password: string) => {
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'recovery',
-    });
-    
-    if (error) return { error };
-    
-    // If OTP verification successful, update the password
-    const { error: updateError } = await supabase.auth.updateUser({
+  const updatePasswordWithToken = async (password: string) => {
+    // Update password using the session from the reset link
+    const { error } = await supabase.auth.updateUser({
       password: password
     });
-    
-    return { error: updateError };
+    return { error };
   };
 
   const value = {
@@ -106,8 +100,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signIn,
     signOut,
-    sendPasswordResetOTP,
-    verifyOTPAndResetPassword,
+    sendPasswordResetEmail,
+    updatePasswordWithToken,
     loading,
   };
 
