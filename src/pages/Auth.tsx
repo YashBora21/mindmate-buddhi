@@ -126,6 +126,8 @@ const Auth = () => {
                     id="signin-password"
                     name="password"
                     type="password"
+                    minLength={6}
+                    placeholder="Enter your password"
                     required
                     disabled={isLoading}
                   />
@@ -167,6 +169,7 @@ const Auth = () => {
                     name="password"
                     type="password"
                     minLength={6}
+                    placeholder="Minimum 6 characters"
                     required
                     disabled={isLoading}
                   />
